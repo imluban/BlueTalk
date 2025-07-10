@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/chatRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#000000"
+    android:padding="16dp">
+
+    <Button
+        android:id="@+id/btnDiscoverBluetooth"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Discover Bluetooth Devices"
+        android:textColor="#00FF00"
+        android:background="@android:color/transparent" />
+
+    <Button
+        android:id="@+id/btnConnectWifiDirect"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Connect via Wi-Fi Direct"
+        android:textColor="#00FF00"
+        android:background="@android:color/transparent" />
+
+    <ScrollView
+        android:id="@+id/scrollView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:id="@+id/messageContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
+
+    <EditText
+        android:id="@+id/inputField"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        android:hint=">_"
+        android:textColor="#00FF00"
+        android:textCursorDrawable="@null"
+        android:textSize="16sp"
+        android:fontFamily="monospace"
+        android:inputType="text"
+        android:maxLines="1" />
+</LinearLayout>
