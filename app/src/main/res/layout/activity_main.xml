@@ -6,6 +6,20 @@
     android:orientation="vertical"
     android:padding="8dp">
 
+    <ImageButton
+        android:id="@+id/btnMenu"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="end"
+        android:background="@drawable/btn_round"
+        android:src="@drawable/ic_more_vert"
+        android:contentDescription="@string/menu"
+        android:scaleType="centerInside"
+        android:tint="@color/black"
+        android:layout_margin="8dp"/>
+
+
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerChat"
         android:layout_width="match_parent"
