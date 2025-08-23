@@ -6,29 +6,36 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pDevice
+import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.inputmethod.EditorInfo
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bluetalk.app.databinding.ActivityMainBinding
 
-class MainActivity : AppCompatActivity(), BluetoothService.Listener, WifiDirectService.Listener {
+class MainActivity : AppCompatActivity(),
+    BluetoothService.Listener,
+    WifiDirectService.Listener {
 
     private lateinit var binding: ActivityMainBinding
     private val chatAdapter = ChatAdapter()
 
     private var btService: BluetoothService? = null
-    private var wifiService: WifiDirectService? = null
+    var wifiService: WifiDirectService? = null // keep public for connect()
 
-    private val requestPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
-        // no-op; user result handled implicitly
-    }
+    private val requestPermissions =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ ->
+            // No-op
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,7 +45,7 @@ class MainActivity : AppCompatActivity(), BluetoothService.Listener, WifiDirectS
         setupRecycler()
         setupInput()
 
-        // initialize services
+        // Initialize services
         btService = BluetoothService(this, this)
         wifiService = WifiDirectService(this, this)
 
@@ -50,11 +57,10 @@ class MainActivity : AppCompatActivity(), BluetoothService.Listener, WifiDirectS
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = chatAdapter
         }
-        statusLine("BlueTalk ready. Open menu (⋮) to connect.")
+        statusLine("✅ BlueTalk ready. Open menu (⋮) to connect.")
     }
 
     private fun setupInput() {
-        // Send on button click
         binding.btnSend.setOnClickListener {
             val text = binding.inputMessage.text?.toString()?.trim().orEmpty()
             if (text.isNotEmpty()) {
@@ -63,8 +69,8 @@ class MainActivity : AppCompatActivity(), BluetoothService.Listener, WifiDirectS
                 binding.inputMessage.setText("")
             }
         }
-        // Send on keyboard action
-        binding.inputMessage.setOnEditorActionListener { v, actionId, _ ->
+
+        binding.inputMessage.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
                 binding.btnSend.performClick()
                 true
@@ -87,11 +93,16 @@ class MainActivity : AppCompatActivity(), BluetoothService.Listener, WifiDirectS
         if (Build.VERSION.SDK_INT >= 33) {
             needs += Manifest.permission.NEARBY_WIFI_DEVICES
         }
-        requestPermissions.launch(needs.toTypedArray())
+
+        if (needs.any {
+                ActivityCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+            }) {
+            requestPermissions.launch(needs.toTypedArray())
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.menu_main, menu)
+        menuInflater.inflate(R.menu.main_menu, menu)
         return true
     }
 
@@ -99,54 +110,103 @@ class MainActivity : AppCompatActivity(), BluetoothService.Listener, WifiDirectS
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_connect_bluetooth -> {
-                val adapter = BluetoothAdapter.getDefaultAdapter()
-                if (adapter == null) {
-                    statusLine("Bluetooth not supported on this device.")
-                } else {
-                    if (!adapter.isEnabled) {
-                        startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
-                    }
-                    // Start listening and try connect to first bonded device for demo
-                    btService?.startServer()
-                    val bonded = adapter.bondedDevices
-                    val target: BluetoothDevice? = bonded.firstOrNull()
-                    if (target != null) {
-                        statusLine("Attempting to connect to ${target.name}…")
-                        btService?.connectTo(target)
-                    } else {
-                        statusLine("No paired devices found. Pair in system settings first.")
-                    }
-                }
+                showBluetoothDevices()
                 true
             }
             R.id.action_connect_wifidirect -> {
                 wifiService?.register()
                 wifiService?.discoverPeers()
-                statusLine("Wi‑Fi Direct: discovering peers… (Messaging coming next build)")
+                statusLine("📡 Wi-Fi Direct: discovering peers…")
                 true
             }
             R.id.action_clear -> {
                 chatAdapter.clear()
                 true
             }
+            R.id.action_exit -> {
+                finishAffinity()
+                true
+            }
             else -> super.onOptionsItemSelected(item)
         }
     }
 
-    // BluetoothService.Listener
+    /** ---------------- Bluetooth Device Picker ---------------- */
+    @SuppressLint("MissingPermission")
+    private fun showBluetoothDevices() {
+        val adapter = BluetoothAdapter.getDefaultAdapter()
+        if (adapter == null) {
+            statusLine("Bluetooth not supported on this device.")
+            return
+        }
+        if (!adapter.isEnabled) {
+            startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+            return
+        }
+
+        btService?.startServer()
+        val devices = adapter.bondedDevices.toList()
+        if (devices.isEmpty()) {
+            statusLine("No paired devices found. Pair in system settings first.")
+            return
+        }
+
+        val names = devices.map { it.name }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Select Bluetooth Device")
+            .setItems(names) { _, which ->
+                val target = devices[which]
+                statusLine("Attempting to connect to ${target.name}…")
+                btService?.connectTo(target)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** ---------------- Wi-Fi Direct Peer Picker ---------------- */
+    override fun onPeers(peers: List<WifiP2pDevice>) {
+        runOnUiThread {
+            if (peers.isEmpty()) {
+                statusLine("📡 Wi-Fi Direct: no peers found")
+            } else {
+                val names = peers.map { it.deviceName }.toTypedArray()
+                AlertDialog.Builder(this)
+                    .setTitle("Select Wi-Fi Direct Peer")
+                    .setItems(names) { _, which ->
+                        val chosen = peers[which]
+                        statusLine("🔗 Connecting to ${chosen.deviceName}…")
+
+                        val config = WifiP2pConfig().apply {
+                            deviceAddress = chosen.deviceAddress
+                        }
+
+                        wifiService?.manager?.connect(
+                            wifiService?.channel,
+                            config,
+                            object : WifiP2pManager.ActionListener {
+                                override fun onSuccess() {
+                                    statusLine("✅ Connected to ${chosen.deviceName}")
+                                }
+
+                                override fun onFailure(reason: Int) {
+                                    statusLine("❌ Connection failed: $reason")
+                                }
+                            }
+                        )
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
+        }
+    }
+
+    /** ---------------- Listeners ---------------- */
     override fun onStatus(msg: String) {
         runOnUiThread { statusLine(msg) }
     }
+
     override fun onMessage(text: String, incoming: Boolean) {
         runOnUiThread { chatAdapter.submit(ChatMessage(text, isIncoming = incoming)) }
-    }
-
-    // WifiDirectService.Listener
-    override fun onPeers(peers: List<WifiP2pDevice>) {
-        runOnUiThread {
-            if (peers.isEmpty()) statusLine("Wi‑Fi Direct: no peers found")
-            else statusLine("Wi‑Fi Direct: found ${peers.size} peers")
-        }
     }
 
     override fun onDestroy() {

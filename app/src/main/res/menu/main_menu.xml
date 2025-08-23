@@ -1,0 +1,21 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_connect_bluetooth"
+        android:title="Connect Bluetooth"
+        android:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_connect_wifidirect"
+        android:title="Connect Wi-Fi Direct"
+        android:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_clear"
+        android:title="Clear Chat"
+        android:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_exit"
+        android:title="Exit"
+        android:showAsAction="never" />
+</menu>
