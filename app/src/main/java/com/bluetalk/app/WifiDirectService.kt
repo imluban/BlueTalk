@@ -3,6 +3,7 @@ package com.bluetalk.app
 import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Context.RECEIVER_NOT_EXPORTED
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
@@ -13,15 +14,18 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.ActivityCompat
 
-class WifiDirectService(private val context: Context, private val listener: Listener) {
+class WifiDirectService(val context: Context, private val listener: Listener) {
+
+    // Exposed so MainActivity can access them (fixes the compile error)
+    val manager: WifiP2pManager =
+        context.getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
+    val channel: WifiP2pManager.Channel =
+        manager.initialize(context, context.mainLooper, null)
 
     interface Listener {
         fun onStatus(msg: String)
         fun onPeers(peers: List<WifiP2pDevice>)
     }
-
-    private val manager = context.getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
-    private val channel = manager.initialize(context, context.mainLooper, null)
 
     private val peersList = mutableListOf<WifiP2pDevice>()
 
@@ -29,14 +33,13 @@ class WifiDirectService(private val context: Context, private val listener: List
         override fun onReceive(c: Context?, intent: Intent?) {
             when (intent?.action) {
                 WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
-                    if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-                        != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        listener.onStatus("Wi-Fi Direct: location permission missing")
+                    if (!hasWifiPermissions()) {
+                        listener.onStatus("Wi-Fi Direct: missing permission")
                         return
                     }
                     manager.requestPeers(channel) { peers ->
                         peersList.clear()
+                        // deviceList is non-null on modern SDKs, but keep safe usage
                         peers.deviceList?.let { peersList.addAll(it) }
                         listener.onPeers(peersList)
                     }
@@ -56,31 +59,28 @@ class WifiDirectService(private val context: Context, private val listener: List
     }
 
     fun register() {
-        context.registerReceiver(receiver, filter)
+        if (Build.VERSION.SDK_INT >= 33) {
+            // Use the modern API with flags on Android 13+
+            context.registerReceiver(receiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            context.registerReceiver(receiver, filter)
+        }
     }
 
     fun unregister() {
-        try {
-            context.unregisterReceiver(receiver)
-        } catch (_: Exception) {
-        }
+        runCatching { context.unregisterReceiver(receiver) }
     }
 
     fun discoverPeers() {
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            listener.onStatus("Wi-Fi Direct: location permission missing")
+        if (!hasWifiPermissions()) {
+            listener.onStatus("Wi-Fi Direct: missing permission")
             return
-        }
-        if (Build.VERSION.SDK_INT >= 33) {
-            // Android 13+ may require NEARBY_WIFI_DEVICES permission depending on use
         }
         manager.discoverPeers(channel, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
                 Log.d("WiFiDirect", "Discovery started")
             }
-
             override fun onFailure(reason: Int) {
                 Log.e("WiFiDirect", "Discovery failed: $reason")
             }
@@ -88,15 +88,29 @@ class WifiDirectService(private val context: Context, private val listener: List
     }
 
     fun connect(device: WifiP2pDevice) {
+        if (!hasWifiPermissions()) {
+            listener.onStatus("Wi-Fi Direct: missing permission")
+            return
+        }
         val config = WifiP2pConfig().apply { deviceAddress = device.deviceAddress }
         manager.connect(channel, config, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
                 Log.d("WiFiDirect", "Connection request successful")
             }
-
             override fun onFailure(reason: Int) {
                 Log.e("WiFiDirect", "Connection failed: $reason")
             }
         })
+    }
+
+    private fun hasWifiPermissions(): Boolean {
+        val fine =
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                    PackageManager.PERMISSION_GRANTED
+        val nearbyOk = if (Build.VERSION.SDK_INT >= 33) {
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.NEARBY_WIFI_DEVICES) ==
+                    PackageManager.PERMISSION_GRANTED
+        } else true
+        return fine && nearbyOk
     }
 }
