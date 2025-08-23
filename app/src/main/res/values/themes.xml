@@ -10,4 +10,9 @@
         <item name="android:windowTranslucentStatus">true</item>
         <item name="android:windowTranslucentNavigation">true</item>
     </style>
+    <style name="MatrixPopup" parent="ThemeOverlay.AppCompat.Light">
+        <item name="android:textColor">@color/matrix_green</item>
+        <item name="android:popupBackground">@color/black</item>
+    </style>
+
 </resources>

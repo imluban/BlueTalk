@@ -15,6 +15,8 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.inputmethod.EditorInfo
+import android.widget.ImageButton
+import android.widget.PopupMenu
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -44,6 +46,7 @@ class MainActivity : AppCompatActivity(),
 
         setupRecycler()
         setupInput()
+        setupMenuButton() // 🔹 Matrix-style popup menu
 
         // Initialize services
         btService = BluetoothService(this, this)
@@ -78,6 +81,58 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
+    // 🔹 NEW: Custom floating ⋮ menu with Matrix styling
+    private fun setupMenuButton() {
+        val btnMenu: ImageButton = findViewById(R.id.btnMenu)
+        btnMenu.setOnClickListener { view ->
+            val popup = PopupMenu(this, view)
+            popup.menuInflater.inflate(R.menu.main_menu, popup.menu)
+
+            // Apply Matrix theme colors
+            try {
+                val style = R.style.MatrixPopup
+                val themedContext = android.view.ContextThemeWrapper(this, style)
+                val styledPopup = PopupMenu(themedContext, view)
+                styledPopup.menuInflater.inflate(R.menu.main_menu, styledPopup.menu)
+
+                styledPopup.setOnMenuItemClickListener { item ->
+                    handleMenuClick(item)
+                }
+                styledPopup.show()
+            } catch (e: Exception) {
+                // fallback in case style fails
+                popup.setOnMenuItemClickListener { item ->
+                    handleMenuClick(item)
+                }
+                popup.show()
+            }
+        }
+    }
+
+    private fun handleMenuClick(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_connect_bluetooth -> {
+                showBluetoothDevices()
+                true
+            }
+            R.id.action_connect_wifidirect -> {
+                wifiService?.register()
+                wifiService?.discoverPeers()
+                statusLine("📡 Wi-Fi Direct: discovering peers…")
+                true
+            }
+            R.id.action_clear -> {
+                chatAdapter.clear()
+                true
+            }
+            R.id.action_exit -> {
+                finishAffinity()
+                true
+            }
+            else -> false
+        }
+    }
+
     private fun statusLine(text: String) {
         chatAdapter.submit(ChatMessage(text, isIncoming = true))
         binding.recyclerChat.scrollToPosition(chatAdapter.itemCount - 1)
@@ -101,35 +156,9 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.main_menu, menu)
-        return true
-    }
-
-    @SuppressLint("MissingPermission")
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_connect_bluetooth -> {
-                showBluetoothDevices()
-                true
-            }
-            R.id.action_connect_wifidirect -> {
-                wifiService?.register()
-                wifiService?.discoverPeers()
-                statusLine("📡 Wi-Fi Direct: discovering peers…")
-                true
-            }
-            R.id.action_clear -> {
-                chatAdapter.clear()
-                true
-            }
-            R.id.action_exit -> {
-                finishAffinity()
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
-        }
-    }
+    // ❌ ActionBar menus disabled
+    override fun onCreateOptionsMenu(menu: Menu): Boolean = false
+    override fun onOptionsItemSelected(item: MenuItem): Boolean = false
 
     /** ---------------- Bluetooth Device Picker ---------------- */
     @SuppressLint("MissingPermission")
