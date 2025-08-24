@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">BlueTalk</string>
-    <string name="hint_type_message">type message…</string>
+    <string name="hint_type_message">Type message…</string>
     <string name="btn_send">Send</string>
     <string name="menu">Menu</string>
 </resources>

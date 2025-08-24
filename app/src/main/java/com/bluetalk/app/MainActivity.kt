@@ -67,8 +67,10 @@ class MainActivity : AppCompatActivity(),
         binding.btnSend.setOnClickListener {
             val text = binding.inputMessage.text?.toString()?.trim().orEmpty()
             if (text.isNotEmpty()) {
-                btService?.write(text + "\n")
-                chatAdapter.submit(ChatMessage(text, isIncoming = false))
+                val profile = com.bluetalk.app.auth.AuthStore.get(this).currentProfile()
+                val nick = profile?.nick ?: "Me"
+                val payload = "$nick::$text\n"
+                btService?.write(payload)   // Wi-Fi Direct can share same path if you use it
                 binding.inputMessage.setText("")
             }
         }
@@ -81,33 +83,46 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
+
+
     // 🔹 NEW: Custom floating ⋮ menu with Matrix styling
     private fun setupMenuButton() {
         val btnMenu: ImageButton = findViewById(R.id.btnMenu)
-        btnMenu.setOnClickListener { view ->
-            val popup = PopupMenu(this, view)
-            popup.menuInflater.inflate(R.menu.main_menu, popup.menu)
-
-            // Apply Matrix theme colors
-            try {
-                val style = R.style.MatrixPopup
-                val themedContext = android.view.ContextThemeWrapper(this, style)
-                val styledPopup = PopupMenu(themedContext, view)
-                styledPopup.menuInflater.inflate(R.menu.main_menu, styledPopup.menu)
-
-                styledPopup.setOnMenuItemClickListener { item ->
-                    handleMenuClick(item)
-                }
-                styledPopup.show()
-            } catch (e: Exception) {
-                // fallback in case style fails
-                popup.setOnMenuItemClickListener { item ->
-                    handleMenuClick(item)
-                }
-                popup.show()
-            }
+        btnMenu.setOnClickListener {
+            showMatrixMenu()
         }
     }
+
+    private fun showMatrixMenu() {
+        val items = arrayOf(
+            "Connect via Bluetooth",
+            "Connect via Wi-Fi Direct",
+            "Clear chat",
+            "Log out",
+            "Exit"
+        )
+
+        AlertDialog.Builder(this, R.style.MatrixMenuDialog)
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> showBluetoothDevices()
+                    1 -> {
+                        wifiService?.register()
+                        wifiService?.discoverPeers()
+                        statusLine("📡 Wi-Fi Direct: discovering peers…")
+                    }
+                    2 -> chatAdapter.clear()
+                    3 -> {
+                        com.bluetalk.app.auth.AuthStore.get(this).logout()
+                        startActivity(Intent(this, LoginActivity::class.java))
+                        finish()
+                    }
+                    4 -> finishAffinity()
+                }
+            }
+            .show()
+    }
+
 
     private fun handleMenuClick(item: MenuItem): Boolean {
         return when (item.itemId) {
@@ -125,6 +140,12 @@ class MainActivity : AppCompatActivity(),
                 chatAdapter.clear()
                 true
             }
+            R.id.action_logout -> {
+                com.bluetalk.app.auth.AuthStore.get(this).logout()
+                startActivity(Intent(this, LoginActivity::class.java))
+                finish()
+                true
+            }
             R.id.action_exit -> {
                 finishAffinity()
                 true
@@ -135,7 +156,9 @@ class MainActivity : AppCompatActivity(),
 
     private fun statusLine(text: String) {
         chatAdapter.submit(ChatMessage(text, isIncoming = true))
-        binding.recyclerChat.scrollToPosition(chatAdapter.itemCount - 1)
+        binding.recyclerChat.post {
+            binding.recyclerChat.scrollToPosition(chatAdapter.itemCount - 1)
+        }
     }
 
     private fun askNeededPermissions() {
@@ -235,8 +258,30 @@ class MainActivity : AppCompatActivity(),
     }
 
     override fun onMessage(text: String, incoming: Boolean) {
-        runOnUiThread { chatAdapter.submit(ChatMessage(text, isIncoming = incoming)) }
+        runOnUiThread {
+            val (nick, msg) = parseNickMessage(text)
+            // simplest approach: put "nick: message" into the item text
+            val display = if (nick != null) "$nick: $msg" else msg
+            chatAdapter.submit(ChatMessage(display, isIncoming = incoming))
+            binding.recyclerChat.post {
+                binding.recyclerChat.scrollToPosition(chatAdapter.itemCount - 1)
+            }
+        }
     }
+
+    // "Nick::Message" → Pair(nick, message)
+    private fun parseNickMessage(raw: String): Pair<String?, String> {
+        val clean = raw.trimEnd('\n', '\r')
+        val idx = clean.indexOf("::")
+        return if (idx in 1 until clean.length - 2) {
+            val nick = clean.substring(0, idx)
+            val msg = clean.substring(idx + 2)
+            nick to msg
+        } else {
+            null to clean
+        }
+    }
+
 
     override fun onDestroy() {
         super.onDestroy()

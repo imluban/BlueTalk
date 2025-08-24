@@ -15,6 +15,10 @@
         android:showAsAction="never" />
 
     <item
+        android:id="@+id/action_logout"
+        android:title="Log out" />
+
+    <item
         android:id="@+id/action_exit"
         android:title="Exit"
         android:showAsAction="never" />

@@ -10,9 +10,28 @@
         <item name="android:windowTranslucentStatus">true</item>
         <item name="android:windowTranslucentNavigation">true</item>
     </style>
+
     <style name="MatrixPopup" parent="ThemeOverlay.AppCompat.Light">
         <item name="android:textColor">@color/matrix_green</item>
         <item name="android:popupBackground">@color/black</item>
+    </style>
+    <style name="MatrixEditText" parent="Widget.AppCompat.EditText">
+        <item name="android:textColor">@color/matrix_green</item>
+        <item name="android:textColorHint">@color/matrix_green_dim</item>
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:backgroundTint">@color/matrix_green</item>
+    </style>
+
+    <style name="MatrixButton" parent="Widget.AppCompat.Button">
+        <item name="android:textColor">@color/black</item>
+        <item name="android:background">@drawable/btn_square</item>
+        <item name="android:fontFamily">monospace</item>
+    </style>
+
+    <style name="MatrixMenuDialog" parent="ThemeOverlay.MaterialComponents.Dialog">
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@drawable/blurred_black_bg</item>
     </style>
 
 </resources>
