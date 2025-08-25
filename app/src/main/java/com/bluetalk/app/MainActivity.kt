@@ -2,8 +2,7 @@ package com.bluetalk.app
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.wifi.p2p.WifiP2pConfig
@@ -11,12 +10,10 @@ import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.inputmethod.EditorInfo
 import android.widget.ImageButton
-import android.widget.PopupMenu
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -32,12 +29,10 @@ class MainActivity : AppCompatActivity(),
     private val chatAdapter = ChatAdapter()
 
     private var btService: BluetoothService? = null
-    var wifiService: WifiDirectService? = null // keep public for connect()
+    var wifiService: WifiDirectService? = null
 
     private val requestPermissions =
-        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ ->
-            // No-op
-        }
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ -> }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,7 +41,7 @@ class MainActivity : AppCompatActivity(),
 
         setupRecycler()
         setupInput()
-        setupMenuButton() // 🔹 Matrix-style popup menu
+        setupMenuButton()
 
         // Initialize services
         btService = BluetoothService(this, this)
@@ -70,7 +65,11 @@ class MainActivity : AppCompatActivity(),
                 val profile = com.bluetalk.app.auth.AuthStore.get(this).currentProfile()
                 val nick = profile?.nick ?: "Me"
                 val payload = "$nick::$text\n"
-                btService?.write(payload)   // Wi-Fi Direct can share same path if you use it
+
+                // 🔹 Only send, don't add duplicate locally.
+                btService?.write(payload)
+                wifiService?.sendMessage(payload)
+
                 binding.inputMessage.setText("")
             }
         }
@@ -83,14 +82,10 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
-
-
-    // 🔹 NEW: Custom floating ⋮ menu with Matrix styling
+    /** --------- Matrix-style menu --------- */
     private fun setupMenuButton() {
         val btnMenu: ImageButton = findViewById(R.id.btnMenu)
-        btnMenu.setOnClickListener {
-            showMatrixMenu()
-        }
+        btnMenu.setOnClickListener { showMatrixMenu() }
     }
 
     private fun showMatrixMenu() {
@@ -107,6 +102,11 @@ class MainActivity : AppCompatActivity(),
                 when (which) {
                     0 -> showBluetoothDevices()
                     1 -> {
+                        if (!hasWifiDirectPermission()) {
+                            statusLine("⚠️ Missing Wi-Fi permission. Requesting…")
+                            askNeededPermissions()
+                            return@setItems
+                        }
                         wifiService?.register()
                         wifiService?.discoverPeers()
                         statusLine("📡 Wi-Fi Direct: discovering peers…")
@@ -121,37 +121,6 @@ class MainActivity : AppCompatActivity(),
                 }
             }
             .show()
-    }
-
-
-    private fun handleMenuClick(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_connect_bluetooth -> {
-                showBluetoothDevices()
-                true
-            }
-            R.id.action_connect_wifidirect -> {
-                wifiService?.register()
-                wifiService?.discoverPeers()
-                statusLine("📡 Wi-Fi Direct: discovering peers…")
-                true
-            }
-            R.id.action_clear -> {
-                chatAdapter.clear()
-                true
-            }
-            R.id.action_logout -> {
-                com.bluetalk.app.auth.AuthStore.get(this).logout()
-                startActivity(Intent(this, LoginActivity::class.java))
-                finish()
-                true
-            }
-            R.id.action_exit -> {
-                finishAffinity()
-                true
-            }
-            else -> false
-        }
     }
 
     private fun statusLine(text: String) {
@@ -179,37 +148,49 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
-    // ❌ ActionBar menus disabled
     override fun onCreateOptionsMenu(menu: Menu): Boolean = false
     override fun onOptionsItemSelected(item: MenuItem): Boolean = false
 
     /** ---------------- Bluetooth Device Picker ---------------- */
     @SuppressLint("MissingPermission")
     private fun showBluetoothDevices() {
-        val adapter = BluetoothAdapter.getDefaultAdapter()
+        val adapter = (getSystemService(BLUETOOTH_SERVICE) as BluetoothManager).adapter
         if (adapter == null) {
             statusLine("Bluetooth not supported on this device.")
             return
         }
         if (!adapter.isEnabled) {
-            startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+            startActivity(Intent(android.bluetooth.BluetoothAdapter.ACTION_REQUEST_ENABLE))
+            return
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+        ) {
+            statusLine("⚠️ Bluetooth permission missing (CONNECT). Requesting…")
+            askNeededPermissions()
             return
         }
 
         btService?.startServer()
+
         val devices = adapter.bondedDevices.toList()
         if (devices.isEmpty()) {
             statusLine("No paired devices found. Pair in system settings first.")
             return
         }
 
-        val names = devices.map { it.name }.toTypedArray()
+        val names = devices.map { it.name ?: it.address }.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle("Select Bluetooth Device")
             .setItems(names) { _, which ->
                 val target = devices[which]
-                statusLine("Attempting to connect to ${target.name}…")
-                btService?.connectTo(target)
+                statusLine("Attempting to connect to ${target.name ?: target.address}…")
+                try {
+                    btService?.connectTo(target)
+                } catch (se: SecurityException) {
+                    statusLine("⚠️ SecurityException: Bluetooth permission denied.")
+                }
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -232,19 +213,27 @@ class MainActivity : AppCompatActivity(),
                             deviceAddress = chosen.deviceAddress
                         }
 
-                        wifiService?.manager?.connect(
-                            wifiService?.channel,
-                            config,
-                            object : WifiP2pManager.ActionListener {
-                                override fun onSuccess() {
-                                    statusLine("✅ Connected to ${chosen.deviceName}")
-                                }
-
-                                override fun onFailure(reason: Int) {
-                                    statusLine("❌ Connection failed: $reason")
-                                }
+                        if (hasWifiDirectPermission()) {
+                            try {
+                                wifiService?.manager?.connect(
+                                    wifiService?.channel,
+                                    config,
+                                    object : WifiP2pManager.ActionListener {
+                                        override fun onSuccess() {
+                                            statusLine("✅ Connected to ${chosen.deviceName}")
+                                        }
+                                        override fun onFailure(reason: Int) {
+                                            statusLine("❌ Connection failed: $reason")
+                                        }
+                                    }
+                                )
+                            } catch (se: SecurityException) {
+                                statusLine("⚠️ SecurityException: Wi-Fi Direct permission denied.")
                             }
-                        )
+                        } else {
+                            statusLine("⚠️ Missing Wi-Fi Direct permission. Requesting…")
+                            askNeededPermissions()
+                        }
                     }
                     .setNegativeButton("Cancel", null)
                     .show()
@@ -260,7 +249,6 @@ class MainActivity : AppCompatActivity(),
     override fun onMessage(text: String, incoming: Boolean) {
         runOnUiThread {
             val (nick, msg) = parseNickMessage(text)
-            // simplest approach: put "nick: message" into the item text
             val display = if (nick != null) "$nick: $msg" else msg
             chatAdapter.submit(ChatMessage(display, isIncoming = incoming))
             binding.recyclerChat.post {
@@ -269,7 +257,6 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
-    // "Nick::Message" → Pair(nick, message)
     private fun parseNickMessage(raw: String): Pair<String?, String> {
         val clean = raw.trimEnd('\n', '\r')
         val idx = clean.indexOf("::")
@@ -282,10 +269,22 @@ class MainActivity : AppCompatActivity(),
         }
     }
 
-
     override fun onDestroy() {
         super.onDestroy()
         btService?.stop()
         wifiService?.unregister()
+    }
+
+    // ---- Helpers ----
+    private fun hasWifiDirectPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= 33) {
+            ActivityCompat.checkSelfPermission(
+                this, Manifest.permission.NEARBY_WIFI_DEVICES
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ActivityCompat.checkSelfPermission(
+                this, Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        }
     }
 }

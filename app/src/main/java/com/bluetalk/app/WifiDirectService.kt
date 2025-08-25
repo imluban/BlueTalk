@@ -3,7 +3,6 @@ package com.bluetalk.app
 import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Context.RECEIVER_NOT_EXPORTED
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
@@ -14,9 +13,9 @@ import android.os.Build
 import android.util.Log
 import androidx.core.app.ActivityCompat
 
-class WifiDirectService(val context: Context, private val listener: Listener) {
+class WifiDirectService(private val context: Context, private val listener: Listener) {
 
-    // Exposed so MainActivity can access them (fixes the compile error)
+    // Exposed so MainActivity can access them
     val manager: WifiP2pManager =
         context.getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
     val channel: WifiP2pManager.Channel =
@@ -39,8 +38,7 @@ class WifiDirectService(val context: Context, private val listener: Listener) {
                     }
                     manager.requestPeers(channel) { peers ->
                         peersList.clear()
-                        // deviceList is non-null on modern SDKs, but keep safe usage
-                        peers.deviceList?.let { peersList.addAll(it) }
+                        peersList.addAll(peers.deviceList)
                         listener.onPeers(peersList)
                     }
                 }
@@ -60,8 +58,7 @@ class WifiDirectService(val context: Context, private val listener: Listener) {
 
     fun register() {
         if (Build.VERSION.SDK_INT >= 33) {
-            // Use the modern API with flags on Android 13+
-            context.registerReceiver(receiver, filter, RECEIVER_NOT_EXPORTED)
+            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
             @Suppress("DEPRECATION")
             context.registerReceiver(receiver, filter)
