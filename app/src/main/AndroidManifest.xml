@@ -18,9 +18,6 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Android 13+ Wi-Fi scanning -->
-    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
-
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
