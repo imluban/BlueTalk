@@ -3,7 +3,7 @@
     android:id="@+id/panelRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/matrix_panel_bg"
+    android:background="@drawable/blurred_black_bg"
     android:padding="12dp">
 
     <LinearLayout
