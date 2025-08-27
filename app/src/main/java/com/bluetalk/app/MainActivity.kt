@@ -22,7 +22,6 @@ class MainActivity : AppCompatActivity(), BluetoothService.Listener {
     private val chatAdapter = ChatAdapter()
 
     private var btService: BluetoothService? = null
-    // wifiService removed
 
     private val requestPermissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ -> }
@@ -107,7 +106,8 @@ class MainActivity : AppCompatActivity(), BluetoothService.Listener {
     }
 
     private fun statusLine(text: String) {
-        chatAdapter.submit(ChatMessage(text, isIncoming = true))
+        // Use "System" as the nickname for status messages
+        chatAdapter.submit(ChatMessage(nick = "System", text = text, isIncoming = true))
         binding.recyclerChat.post {
             binding.recyclerChat.scrollToPosition(chatAdapter.itemCount - 1)
         }
@@ -119,12 +119,9 @@ class MainActivity : AppCompatActivity(), BluetoothService.Listener {
             needs += Manifest.permission.BLUETOOTH_CONNECT
             needs += Manifest.permission.BLUETOOTH_SCAN
         }
-        // Keep location only if your Bluetooth flow needs it — otherwise remove it
         needs += Manifest.permission.ACCESS_FINE_LOCATION
 
-        if (needs.any {
-                ActivityCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-            }) {
+        if (needs.any { ActivityCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }) {
             requestPermissions.launch(needs.toTypedArray())
         }
     }
@@ -185,8 +182,8 @@ class MainActivity : AppCompatActivity(), BluetoothService.Listener {
     override fun onMessage(text: String, incoming: Boolean) {
         runOnUiThread {
             val (nick, msg) = parseNickMessage(text)
-            val display = if (nick != null) "$nick: $msg" else msg
-            chatAdapter.submit(ChatMessage(display, isIncoming = incoming))
+            val sender = nick ?: "Unknown"
+            chatAdapter.submit(ChatMessage(nick = sender, text = msg, isIncoming = incoming))
             binding.recyclerChat.post {
                 binding.recyclerChat.scrollToPosition(chatAdapter.itemCount - 1)
             }
