@@ -84,6 +84,7 @@ class MainActivity : AppCompatActivity(), BluetoothService.Listener {
         val items = arrayOf(
             "Connect via Bluetooth",
             "Clear chat",
+            "Profile",
             "Log out",
             "Exit"
         )
@@ -93,12 +94,13 @@ class MainActivity : AppCompatActivity(), BluetoothService.Listener {
                 when (which) {
                     0 -> showBluetoothDevices()
                     1 -> chatAdapter.clear()
-                    2 -> {
+                    2 -> startActivity(Intent(this, ProfileActivity::class.java))
+                    3 -> {
                         com.bluetalk.app.auth.AuthStore.get(this).logout()
                         startActivity(Intent(this, LoginActivity::class.java))
                         finish()
                     }
-                    3 -> finishAffinity()
+                    4 -> finishAffinity()
                 }
             }
             .show()

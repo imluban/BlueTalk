@@ -8,8 +8,11 @@ import java.util.*
 
 data class UserProfile(
     val phone: String,
-    val fullName: String,
-    val nick: String
+    val password: String = "",
+    val name: String,
+    val nick: String,
+    val bio: String = "",
+    val photoUri: String? = null
 )
 
 class AuthStore private constructor(private val ctx: Context) {
@@ -51,7 +54,15 @@ class AuthStore private constructor(private val ctx: Context) {
         val phone = prefs.getString("cur_phone", null) ?: return null
         val fullName = prefs.getString("cur_fullName", "") ?: ""
         val nick = prefs.getString("cur_nick", "") ?: ""
-        return UserProfile(phone, fullName, nick)
+        val bio = prefs.getString("cur_bio", "") ?: ""
+        val photoUri = prefs.getString("cur_photoUri", null)
+        return UserProfile(
+            phone = phone,
+            name = fullName,
+            nick = nick,
+            bio = bio,
+            photoUri = photoUri
+        )
     }
 
     fun logout() {
@@ -60,6 +71,8 @@ class AuthStore private constructor(private val ctx: Context) {
             .remove("cur_phone")
             .remove("cur_fullName")
             .remove("cur_nick")
+            .remove("cur_bio")
+            .remove("cur_photoUri")
             .apply()
     }
 
@@ -82,6 +95,8 @@ class AuthStore private constructor(private val ctx: Context) {
             // profile
             .putString("user_${phone}_fullName", fullName)
             .putString("user_${phone}_nick", nick)
+            .putString("user_${phone}_bio", "")
+            .putString("user_${phone}_photoUri", null)
             .apply()
 
         // auto-login after signup
@@ -90,6 +105,8 @@ class AuthStore private constructor(private val ctx: Context) {
             .putString("cur_phone", phone)
             .putString("cur_fullName", fullName)
             .putString("cur_nick", nick)
+            .putString("cur_bio", "")
+            .putString("cur_photoUri", null)
             .apply()
 
         return true
@@ -106,14 +123,36 @@ class AuthStore private constructor(private val ctx: Context) {
 
         val fullName = prefs.getString("user_${phone}_fullName", "") ?: ""
         val nick = prefs.getString("user_${phone}_nick", "") ?: ""
+        val bio = prefs.getString("user_${phone}_bio", "") ?: ""
+        val photoUri = prefs.getString("user_${phone}_photoUri", null)
 
         prefs.edit()
             .putBoolean("logged_in", true)
             .putString("cur_phone", phone)
             .putString("cur_fullName", fullName)
             .putString("cur_nick", nick)
+            .putString("cur_bio", bio)
+            .putString("cur_photoUri", photoUri)
             .apply()
 
         return true
+    }
+
+    /** Save updated profile fields for current user */
+    fun saveProfile(profile: UserProfile) {
+        val phone = profile.phone
+
+        prefs.edit()
+            // persistent user storage
+            .putString("user_${phone}_fullName", profile.name)
+            .putString("user_${phone}_nick", profile.nick)
+            .putString("user_${phone}_bio", profile.bio)
+            .putString("user_${phone}_photoUri", profile.photoUri)
+            // update current session
+            .putString("cur_fullName", profile.name)
+            .putString("cur_nick", profile.nick)
+            .putString("cur_bio", profile.bio)
+            .putString("cur_photoUri", profile.photoUri)
+            .apply()
     }
 }

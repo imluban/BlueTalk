@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/panelRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/matrix_panel_bg"
+    android:padding="12dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@android:color/transparent">
+
+        <!-- macOS style title bar -->
+        <LinearLayout
+            android:id="@+id/titleBar"
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
+
+            <View
+                android:id="@+id/btnClose"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/macos_btn_red" />
+
+            <View
+                android:id="@+id/btnDrag"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/macos_btn_yellow" />
+
+            <View
+                android:id="@+id/btnMaximize"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:background="@drawable/macos_btn_green" />
+        </LinearLayout>
+
+        <!-- Scrollable profile content -->
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal">
+
+                <!-- Profile Image -->
+                <ImageView
+                    android:id="@+id/profileImage"
+                    android:layout_width="96dp"
+                    android:layout_height="96dp"
+                    android:layout_marginTop="12dp"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/ic_person_placeholder"
+                    android:background="@drawable/circle_mask"
+                    android:clipToOutline="true"
+                    android:contentDescription="Profile picture" />
+
+                <Button
+                    android:id="@+id/btnPickImage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Change Picture"
+                    android:textAllCaps="false"
+                    android:textColor="@color/matrix_green"
+                    android:background="@android:color/transparent" />
+
+                <!-- Name -->
+                <EditText
+                    android:id="@+id/inputName"
+                    style="@style/MatrixEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Full Name"
+                    android:layout_marginTop="16dp" />
+
+                <!-- Nickname -->
+                <EditText
+                    android:id="@+id/inputNick"
+                    style="@style/MatrixEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Nickname" />
+
+                <!-- Bio -->
+                <EditText
+                    android:id="@+id/inputBio"
+                    style="@style/MatrixEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Bio"
+                    android:minLines="3"
+                    android:gravity="top|start" />
+
+                <!-- Save button -->
+                <Button
+                    android:id="@+id/btnSave"
+                    style="@style/MatrixButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Save"
+                    android:textAllCaps="false"
+                    android:textColor="@color/black"
+                    android:background="@drawable/btn_square" />
+
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+</FrameLayout>

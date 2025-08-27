@@ -33,9 +33,8 @@ class ChatAdapter : RecyclerView.Adapter<ChatAdapter.VH>() {
     class VH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val txt: TextView = itemView.findViewById(R.id.txtMessage)
         fun bind(item: ChatMessage) {
-            // Simple terminal line: prefix incoming/outgoing with symbols
-            val prefix = if (item.isIncoming) "&lt;" else "&gt;"
-            txt.text = "$prefix ${item.text}"
+            // Show nickname and message, no prefixes
+            txt.text = "${item.nick}: ${item.text}"
         }
     }
 }
