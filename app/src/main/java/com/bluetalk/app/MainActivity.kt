@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity(), BluetoothService.Listener {
             layoutManager = LinearLayoutManager(this@MainActivity)
             adapter = chatAdapter
         }
-        statusLine("BlueTalk is ready. Open menu (⋮) to connect!")
+        statusLine("BlueTalk is made by Luban Noor. Open menu (⋮) to connect with other!")
     }
 
     private fun setupInput() {
